@@ -86,6 +86,9 @@ h1 {
   border: 1px solid #ddd;
   background: white;
   font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .quantity-control input {
