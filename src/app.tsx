@@ -83,8 +83,6 @@ const MenuCalculator = () => {
 
   return (
     <div className="calculator-container">
-      <h1>菜单价格计算器</h1>
-      
       <div className="search-box">
         <input
           type="text"
