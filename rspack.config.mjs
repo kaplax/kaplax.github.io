@@ -13,6 +13,13 @@ export default defineConfig({
   experiments: {
     css: true,
   },
+  devServer: {
+    historyApiFallback: {
+      index: '/',
+      disableDotRule: true
+    },
+    port: 8081, 
+  },
   module: {
     rules: [
       {
