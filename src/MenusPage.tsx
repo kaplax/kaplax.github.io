@@ -235,8 +235,6 @@ const MenusPage = () => {
 
   return (
     <div className="menus-container">
-      <h1>Menu</h1>
-
       <div className="category-tabs">
         {categories.map(category => (
           <button
