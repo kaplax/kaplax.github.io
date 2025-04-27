@@ -18,7 +18,7 @@ interface WSEventData {
   data: MenuData;
 }
 
-const apiPath = 'ws://139.224.71.200'; // process.env.API_PATH || 'http://localhost';
+const apiPath = 'wss://139.224.71.200'; // process.env.API_PATH || 'http://localhost';
 const wsPort = "80";
 const apiPort = "80"
 
