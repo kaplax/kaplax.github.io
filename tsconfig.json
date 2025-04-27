@@ -1,14 +1,22 @@
 {
   "compilerOptions": {
+    "target": "es5",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "strict": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "*": ["src/*"]
+      "*": [
+        "src/*"
+      ]
     },
-    "lib": ["es2019", "dom"]
+    "lib": [
+      "es2019",
+      "dom"
+    ]
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }
