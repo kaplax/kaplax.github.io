@@ -18,7 +18,7 @@ interface WSEventData {
   data: MenuData;
 }
 
-const apiPath = 'https://test-bkcaqgrdyz.cn-hangzhou.fcapp.run'; // process.env.API_PATH || 'http://localhost';
+const apiPath = 'ws://test-bkcaqgrdyz.cn-hangzhou.fcapp.run'; // process.env.API_PATH || 'http://localhost';
 const wsPort = "80";
 const apiPort = "80"
 
@@ -89,6 +89,7 @@ const MenusPage = () => {
     if (wsRef.current) {
       wsRef.current.onmessage = (event) => {
         try {
+          console.log('event.data', event.data);
           const data: WSEventData = JSON.parse(event.data);
           if (data.type === "menu") {
             setMenuData(data.data.menus);
