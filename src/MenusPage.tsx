@@ -18,7 +18,7 @@ interface WSEventData {
   data: MenuData;
 }
 
-const apiPath = 'wss://test-bkcaqgrdyz.cn-hangzhou.fcapp.run'; // process.env.API_PATH || 'http://localhost';
+const apiPath = 'ws://139.224.71.200'; // process.env.API_PATH || 'http://localhost';
 const wsPort = "80";
 const apiPort = "80"
 
@@ -37,10 +37,118 @@ const MenusPage = () => {
   const [isDragging, setIsDragging] = useState(false); // State to track dragging
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); // State to track drag offset
   const wsRef = useRef<WebSocket | null>(null);
-  if (wsRef.current === null) {
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isConnectingRef = useRef<boolean>(false);
+  
+  // WebSocket connection function
+  const connectWebSocket = () => {
+    // Prevent multiple connection attempts
+    if (isConnectingRef.current) {
+      console.log('Connection already in progress, skipping');
+      return;
+    }
+    
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      console.log('WebSocket already connected or connecting, skipping');
+      return;
+    }
+    
+    isConnectingRef.current = true;
+    console.log('Connecting to WebSocket...');
+    
     wsRef.current = new WebSocket(`${apiPath}`);
-  }
-  // const wsRef = useRef<WebSocket | null>(null);
+    
+    wsRef.current.onopen = () => {
+      console.log('WebSocket connected');
+      setLoading(false);
+      setError(null);
+      isConnectingRef.current = false;
+    };
+
+    wsRef.current.onmessage = (event) => {
+      try {
+        console.log('event.data', event.data);
+        const data: WSEventData = JSON.parse(event.data);
+        if (data.type === "menu") {
+          setMenuData(data.data.menus);
+        } else if (data.type === "selectedMenu") {
+          setSelectedMenu(data.data.menus);
+        }
+        setLoading(false);
+      } catch (err) {
+        setError('Error parsing menu data');
+        setLoading(false);
+      }
+    };
+
+    wsRef.current.onerror = (err) => {
+      console.error('WebSocket error', err);
+      setError('WebSocket error');
+      setLoading(false);
+      isConnectingRef.current = false;
+    };
+
+    wsRef.current.onclose = () => {
+      console.log('WebSocket closed, attempting to reconnect...');
+      isConnectingRef.current = false;
+      
+      // Try to reconnect after a delay
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+    };
+  };
+
+  // Initial connection - only run once on component mount
+  useEffect(() => {
+    // Only connect if we don't already have a connection
+    connectWebSocket();
+
+    // Handle visibility change (when tab becomes visible after being hidden)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Document became visible, checking WebSocket connection');
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          connectWebSocket();
+        }
+      }
+    };
+
+    // Handle online/offline events
+    const handleOnline = () => {
+      console.log('Network connection restored, reconnecting WebSocket');
+      connectWebSocket();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+    
+    // Set up ping interval to keep connection alive
+    const pingInterval = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000); // Send ping every 30 seconds
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      
+      clearInterval(pingInterval);
+      
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      
+      isConnectingRef.current = false;
+    };
+  }, []); // Empty dependency array ensures this only runs once on mount
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -84,40 +192,6 @@ const MenusPage = () => {
     };
   }, [isDragging, dragOffset]);
 
-  // Add event listeners for drag and drop
-  useEffect(() => {
-    if (wsRef.current) {
-      wsRef.current.onmessage = (event) => {
-        try {
-          console.log('event.data', event.data);
-          const data: WSEventData = JSON.parse(event.data);
-          if (data.type === "menu") {
-            setMenuData(data.data.menus);
-          } else if (data.type === "selectedMenu") {
-            setSelectedMenu(data.data.menus);
-          }
-          setLoading(false);
-        } catch (err) {
-          setError('Error parsing menu data');
-          setLoading(false);
-        }
-      };
-
-      wsRef.current.onerror = (err) => {
-        console.error('WebSocket error', err);
-        setError('WebSocket error');
-        setLoading(false);
-      };
-
-      return () => {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.close();
-        }
-
-      };
-    }
-  }, []); // Depend on isDragging and dragOffset
-
   const handleMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
     setIsDragging(true);
     setDragOffset({
@@ -148,10 +222,15 @@ const MenusPage = () => {
   };
 
   const addProductToMenu = async (item: MenuItem) => {
-    wsRef.current?.send(JSON.stringify({
-      type: "addToMenu",
-      data: item,
-    }));
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "addToMenu",
+        data: item,
+      }));
+    } else {
+      showMessage("Connection lost. Trying to reconnect...");
+      connectWebSocket();
+    }
   };
 
   const addMenuItem = async (item: MenuItem) => {
@@ -163,25 +242,39 @@ const MenusPage = () => {
       return; // Do not add the item again
     }
 
-    wsRef.current?.send(JSON.stringify({
-      type: "addToSelectedMenu",
-      data: item,
-    }));
-
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "addToSelectedMenu",
+        data: item,
+      }));
+    } else {
+      showMessage("Connection lost. Trying to reconnect...");
+      connectWebSocket();
+    }
   };
 
   const removeSelectedMenuItem = async (itemId: string) => {
-    wsRef.current?.send(JSON.stringify({
-      type: "removeFromSelectedMenu",
-      data: { id: itemId },
-    }));
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "removeFromSelectedMenu",
+        data: { id: itemId },
+      }));
+    } else {
+      showMessage("Connection lost. Trying to reconnect...");
+      connectWebSocket();
+    }
   };
 
   const removeMenuItem = async (itemId: string) => {
-    wsRef.current?.send(JSON.stringify({
-      type: "removeFromMenu",
-      data: { id: itemId },
-    }));
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "removeFromMenu",
+        data: { id: itemId },
+      }));
+    } else {
+      showMessage("Connection lost. Trying to reconnect...");
+      connectWebSocket();
+    }
   };
 
   const handleAddCustomItemClick = () => {
@@ -214,7 +307,7 @@ const MenusPage = () => {
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div style={{position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)"}}>正在尝试重新连接, 请稍等...</div>;
   }
 
   // Group menu items by type
