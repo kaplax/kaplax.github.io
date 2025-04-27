@@ -146,70 +146,41 @@ const MenusPage = () => {
     setShowMessageModal(false);
   };
 
+  const addProductToMenu = async (item: MenuItem) => {
+    wsRef.current?.send(JSON.stringify({
+      type: "addToMenu",
+      data: item,
+    }));
+  };
+
   const addMenuItem = async (item: MenuItem) => {
     // Check if the item is already in the selected menu
     const isItemAlreadySelected = selectedMenu.some(selectedItem => selectedItem.id === item.id);
 
-    console.log('isItemAlreadySelected', isItemAlreadySelected);
     if (isItemAlreadySelected) {
       showMessage(`${item.name} is already in the selected menu.`);
       return; // Do not add the item again
     }
 
-    try {
-      const response = await fetch(`${apiPath}:${apiPort}/selectedMenu`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(item),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to add menu item');
-      }
-      // Assuming the server sends updated selectedMenu via WebSocket
-    } catch (err) {
-      console.error('Error adding menu item', err);
-      setError('Error adding menu item');
-    }
+    wsRef.current?.send(JSON.stringify({
+      type: "addToSelectedMenu",
+      data: item,
+    }));
+
   };
 
   const removeSelectedMenuItem = async (itemId: string) => {
-    try {
-      const response = await fetch(`${apiPath}:${apiPort}/selectedMenu`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: itemId }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to remove selected menu item');
-      }
-      // Assuming the server sends updated selectedMenu via WebSocket
-    } catch (err) {
-      console.error('Error removing selected menu item', err);
-      setError('Error removing selected menu item');
-    }
+    wsRef.current?.send(JSON.stringify({
+      type: "removeFromSelectedMenu",
+      data: { id: itemId },
+    }));
   };
 
   const removeMenuItem = async (itemId: string) => {
-    try {
-      const response = await fetch(`${apiPath}:${apiPort}/menu`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: itemId }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to remove selected menu item');
-      }
-      // Assuming the server sends updated selectedMenu via WebSocket
-    } catch (err) {
-      console.error('Error removing selected menu item', err);
-      setError('Error removing selected menu item');
-    }
+    wsRef.current?.send(JSON.stringify({
+      type: "removeFromMenu",
+      data: { id: itemId },
+    }));
   };
 
   const handleAddCustomItemClick = () => {
@@ -225,7 +196,7 @@ const MenusPage = () => {
         image: '', // No image for custom items
         type: activeCategory as string,
       };
-      await addMenuItem(customItem);
+      await addProductToMenu(customItem);
       setCustomItemName('');
       setShowCustomItemModal(false);
     }
