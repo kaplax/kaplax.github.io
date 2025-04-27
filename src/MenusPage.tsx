@@ -18,7 +18,7 @@ interface WSEventData {
   data: MenuData;
 }
 
-const apiPath = 'ws://test-bkcaqgrdyz.cn-hangzhou.fcapp.run'; // process.env.API_PATH || 'http://localhost';
+const apiPath = 'wss://test-bkcaqgrdyz.cn-hangzhou.fcapp.run'; // process.env.API_PATH || 'http://localhost';
 const wsPort = "80";
 const apiPort = "80"
 
